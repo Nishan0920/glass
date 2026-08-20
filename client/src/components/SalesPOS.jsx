@@ -16,7 +16,7 @@ function SalesPOS() {
   const total = 12127
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 p-8 font-sans">
+    <div className="w-full h-screen bg-gray-50 p-8 overflow-y-auto">
       <div className="max-w-[1400px] mx-auto">
 
         {/* Top bar */}
