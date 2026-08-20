@@ -300,22 +300,24 @@ const Customers = () => {
                           : "-"}
                       </td>
 
-                      <td className="flex gap-3 px-4 py-3 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(customer)}
-                          className="cursor-pointer text-blue-600 hover:text-blue-800"
-                        >
-                          u
-                        </button>
+                      <td className="px-4 py-3 text-xs">
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(customer)}
+                            className="cursor-pointer text-blue-600 hover:text-blue-800"
+                          >
+                            u
+                          </button>
 
-                        <button
-                          onClick={()=> handleDelete(customer._id)}
-                          type="button"
-                          className="cursor-pointer text-red-600 hover:text-red-800"
-                        >
-                          d
-                        </button>
+                          <button
+                            onClick={() => handleDelete(customer._id)}
+                            type="button"
+                            className="cursor-pointer text-red-600 hover:text-red-800"
+                          >
+                            d
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
