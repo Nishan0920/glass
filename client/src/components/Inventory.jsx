@@ -1,33 +1,22 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 
+const emptyInventory = {
+  productname: "",
+  category: "",
+  brand: "",
+  stock: "",
+};
+
 const Inventory = () => {
   const [showModal, setShowModal] = useState(false);
   const [inventories, setInventories] = useState([]);
   const [editingInventory, setEditingInventory] = useState(null);
   const [search, setSearch] = useState("");
 
-  const [inventory, setInventory] = useState({
-    productname: "",
-    category: "",
-    brand: "",
-    sku: "",
-    stock: "",
-    barcode: "",
-  });
-  //fort updating the exisitng inventory
-  const handleEdit = (inventory) => {
-    setEditingInventory(inventory);
-    setInventory({
-      productname: "",
-      category: "",
-      brand: "",
-      sku: "",
-      stock: "",
-      barcode: "",
-    });
-  };
-  //for getting all data of the inventory
+  const [inventory, setInventory] = useState(emptyInventory);
+
+  // GET ALL INVENTORY
   const getInventory = async () => {
     try {
       const result = await axios.get(
@@ -61,9 +50,36 @@ const Inventory = () => {
       } else {
         alert("Something went wrong");
       }
-
-      setInventories([]);
     }
+  };
+  //for deleting the item from the inventory
+  const handleDelete = async (inventoryID) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this item from inventory?",
+    );
+    if (!confirmDelete) {
+      return;
+    }
+    try {
+      const result = await axios.delete(
+        `http://localhost:3000/api/inventory/${inventoryID}`,
+      );
+      if (result.data.success) {
+        alert("Item deleted successfully from inventory");
+
+        getInventory();
+      } else {
+        alert(result.data.message || "Failed to delete customer");
+        if (error.response) {
+          alert(
+            error.response.data.message ||
+              "Server error while deleting customer",
+          );
+        } else {
+          alert("Something went wrong.");
+        }
+      }
+    } catch (error) {}
   };
 
   useEffect(() => {
@@ -80,13 +96,19 @@ const Inventory = () => {
   };
 
   const handleAddInventory = () => {
+    setEditingInventory(null);
+    setInventory(emptyInventory);
+    setShowModal(true);
+  };
+
+  const handleEdit = (product) => {
+    setEditingInventory(product);
+
     setInventory({
-      productname: "",
-      category: "",
-      brand: "",
-      sku: "",
-      stock: "",
-      barcode: "",
+      productname: product.ProductName || "",
+      category: product.Category || "",
+      brand: product.Brand || "",
+      stock: product.Stock ?? "",
     });
 
     setShowModal(true);
@@ -94,54 +116,53 @@ const Inventory = () => {
 
   const handleCloseModal = () => {
     setShowModal(false);
-
-    setInventory({
-      productname: "",
-      category: "",
-      brand: "",
-      sku: "",
-      stock: "",
-      barcode: "",
-    });
+    setEditingInventory(null);
+    setInventory(emptyInventory);
   };
-
+  // for adding and updathing the items in inventory
   const handleOnSubmit = async (e) => {
     e.preventDefault();
 
     try {
-      const result = await axios.post("http://localhost:3000/api/inventory", {
+      let result;
+
+      const data = {
         ProductName: inventory.productname,
         Category: inventory.category,
         Brand: inventory.brand,
-        Sku: inventory.sku,
-        Barcode: inventory.barcode,
         Stock: inventory.stock,
-      });
+      };
+
+      if (editingInventory) {
+        result = await axios.put(
+          `http://localhost:3000/api/inventory/${editingInventory._id}`,
+          data,
+        );
+      } else {
+        result = await axios.post("http://localhost:3000/api/inventory", data);
+      }
 
       if (result.data.success) {
-        alert(result.data.message || "Successfully added item");
-
-        setInventory({
-          productname: "",
-          category: "",
-          brand: "",
-          sku: "",
-          stock: "",
-          barcode: "",
-        });
+        alert(
+          editingInventory
+            ? "Item updated successfully"
+            : "Item added successfully",
+        );
 
         setShowModal(false);
+        setEditingInventory(null);
+        setInventory(emptyInventory);
 
         await getInventory();
       } else {
-        alert(result.data.message || "Failed to add inventory");
+        alert(result.data.message || "Operation failed");
       }
     } catch (error) {
-      console.error("Error adding inventory:", error);
+      console.error("Error saving inventory:", error);
 
       if (error.response) {
         alert(
-          error.response.data.message || "Server error while adding inventory",
+          error.response.data.message || "Server error while saving inventory",
         );
       } else if (error.request) {
         alert("Could not connect to the server");
@@ -228,6 +249,24 @@ const Inventory = () => {
                     </div>
                   </div>
                 </div>
+
+                <div className="flex justify-end gap-4 border-t border-gray-100 px-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(product)}
+                    className="cursor-pointer text-blue-600 hover:text-blue-800"
+                  >
+                    <i className="fa-solid fa-pen "></i>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={()=> handleDelete(product._id)}
+                    className="cursor-pointer text-red-600 hover:text-red-800"
+                  >
+                    <i className="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
               </div>
             ))
           ) : (
@@ -244,7 +283,7 @@ const Inventory = () => {
             <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
               <div className="flex items-center justify-between border-b p-5">
                 <h2 className="text-lg font-semibold text-gray-800">
-                  Add New Product
+                  {editingInventory ? "Update Product" : "Add New Product"}
                 </h2>
 
                 <button
@@ -333,7 +372,7 @@ const Inventory = () => {
                     type="submit"
                     className="cursor-pointer rounded-md bg-blue-600 px-5 py-2 text-xs text-white hover:bg-blue-700"
                   >
-                    Add Product
+                    {editingInventory ? "Update Product" : "Add Product"}
                   </button>
                 </div>
               </form>
