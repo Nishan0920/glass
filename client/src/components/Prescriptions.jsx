@@ -1,106 +1,627 @@
+import axios from "axios";
+import React, { useEffect, useMemo, useState } from "react";
+
+const API_URL = "http://localhost:3000/api";
+
 function Prescriptions() {
-  const prescriptions = [
-    { id: 1, rxId: "RX-1254", customer: "Rahul Verma", date: "May 12, 2025", type: "Single Vision", right: "-1.50 SPH -0.75 CYL 180°", left: "-1.25 SPH -0.50 CYL 175°" },
-    { id: 2, rxId: "RX-1253", customer: "Neha Sharma", date: "May 11, 2025", type: "Bifocal", right: "-2.00 SPH ADD +1.50", left: "-1.75 SPH ADD +1.50" },
-    { id: 3, rxId: "RX-1252", customer: "Amit Patel", date: "May 10, 2025", type: "Progressive", right: "-3.25 SPH ADD +2.00", left: "-3.00 SPH ADD +2.00" },
-    { id: 4, rxId: "RX-1251", customer: "Priya Mehta", date: "May 09, 2025", type: "Single Vision", right: "-0.75 SPH -0.50 CYL 90°", left: "-0.50 SPH -0.25 CYL 85°" },
-    { id: 5, rxId: "RX-1250", customer: "Vikram Joshi", date: "May 08, 2025", type: "Bifocal", right: "-1.25 SPH ADD +1.25", left: "-1.00 SPH ADD +1.25" },
-  ]
+  // =========================================================
+  // STATES
+  // =========================================================
+
+  const [prescriptions, setPrescriptions] = useState([]);
+
+  const [search, setSearch] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+  const [selectedCustomerId, setSelectedCustomerId] =
+    useState("");
+
+  // =========================================================
+  // GET CUSTOMER ID FROM URL
+  // =========================================================
+
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const customerId = params.get("customerId");
+
+    if (customerId) {
+      setSelectedCustomerId(customerId);
+    }
+  }, []);
+
+  // =========================================================
+  // GET ALL PRESCRIPTIONS
+  // =========================================================
+
+  const getPrescriptions = async () => {
+    try {
+      setLoading(true);
+
+      const result = await axios.get(
+        `${API_URL}/prescriptionalldata`
+      );
+
+      if (result.data.success) {
+        setPrescriptions(
+          result.data.prescriptions || []
+        );
+      } else {
+        setPrescriptions([]);
+      }
+    } catch (error) {
+      console.error(
+        "Error fetching prescriptions:",
+        error
+      );
+
+      if (error.response) {
+        alert(
+          error.response.data.message ||
+            "Failed to load prescriptions."
+        );
+      } else if (error.request) {
+        alert("Could not connect to the server.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // =========================================================
+  // LOAD PRESCRIPTIONS
+  // =========================================================
+
+  useEffect(() => {
+    getPrescriptions();
+  }, []);
+
+  // =========================================================
+  // SEARCH + CUSTOMER FILTER
+  // =========================================================
+
+  const filteredPrescriptions = useMemo(() => {
+    const searchValue = search
+      .toLowerCase()
+      .trim();
+
+    return prescriptions.filter((prescription) => {
+
+      // -----------------------------------------------------
+      // CUSTOMER ID FILTER
+      // -----------------------------------------------------
+
+      if (
+        selectedCustomerId &&
+        prescription.CustomerId !==
+          selectedCustomerId
+      ) {
+        return false;
+      }
+
+      // -----------------------------------------------------
+      // SEARCH
+      // -----------------------------------------------------
+
+      if (!searchValue) {
+        return true;
+      }
+
+      return (
+        prescription.PrescriptionId?.toLowerCase().includes(
+          searchValue
+        ) ||
+        prescription.CustomerName?.toLowerCase().includes(
+          searchValue
+        ) ||
+        prescription.CustomerPhone?.toLowerCase().includes(
+          searchValue
+        )
+      );
+    });
+  }, [
+    prescriptions,
+    search,
+    selectedCustomerId,
+  ]);
+
+  // =========================================================
+  // STATISTICS
+  // =========================================================
+
+  const totalPrescriptions =
+    prescriptions.length;
+
+  const singleVisionCount =
+    prescriptions.filter(
+      (p) => p.Type === "Single Vision"
+    ).length;
+
+  const bifocalCount =
+    prescriptions.filter(
+      (p) => p.Type === "Bifocal"
+    ).length;
+
+  // =========================================================
+  // CLEAR CUSTOMER FILTER
+  // =========================================================
+
+  const clearCustomerFilter = () => {
+    setSelectedCustomerId("");
+
+    const url = new URL(window.location.href);
+
+    url.searchParams.delete("customerId");
+
+    window.history.replaceState(
+      {},
+      "",
+      url.toString()
+    );
+  };
+
+  // =========================================================
+  // FORMAT DATE
+  // =========================================================
+
+  const formatDate = (date) => {
+    if (!date) {
+      return "-";
+    }
+
+    return new Date(date).toLocaleDateString(
+      undefined,
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }
+    );
+  };
+
+  // =========================================================
+  // EYE DISPLAY
+  // =========================================================
+
+  const formatEye = (eye) => {
+    if (!eye) {
+      return "-";
+    }
+
+    const values = [];
+
+    if (eye.sph) {
+      values.push(`SPH ${eye.sph}`);
+    }
+
+    if (eye.cyl) {
+      values.push(`CYL ${eye.cyl}`);
+    }
+
+    if (eye.axis) {
+      values.push(`AXIS ${eye.axis}°`);
+    }
+
+    if (eye.add) {
+      values.push(`ADD ${eye.add}`);
+    }
+
+    return values.length > 0
+      ? values.join(" ")
+      : "-";
+  };
+
+  // =========================================================
+  // UI
+  // =========================================================
 
   return (
-    <div className="w-full h-screen bg-gray-100 p-8 flex flex-col overflow-hidden">
-      <div className="max-w-[1400px] w-full mx-auto flex flex-col flex-1 min-h-0">
+    <div className="min-h-screen w-full bg-gray-100 p-4 sm:p-6 lg:p-8">
 
-        {/* Header */}
-        <div className="flex justify-between items-center mb-5 shrink-0">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col">
+
+        {/* ===================================================
+            HEADER
+        ==================================================== */}
+
+        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
           <div>
-            <h2 className="text-2xl font-bold">Prescriptions</h2>
-            <p className="text-sm text-gray-400">Manage and track customer prescriptions</p>
+
+            <h2 className="text-2xl font-bold text-gray-900">
+              Prescriptions
+            </h2>
+
+            <p className="mt-1 text-sm text-gray-400">
+              Manage and track customer prescriptions
+            </p>
+
           </div>
+
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-              📅 May 12, 2025
+
+            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600">
+
+              {new Date().toLocaleDateString(
+                undefined,
+                {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                }
+              )}
+
             </div>
-            <span className="text-lg">🔔</span>
+
           </div>
+
         </div>
 
-        {/* Search + button */}
-        <div className="flex justify-between items-center gap-3 mb-5 shrink-0">
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-4 py-2.5 flex-1 min-w-[300px]">
-            <span>🔍</span>
+        {/* ===================================================
+            SEARCH
+        ==================================================== */}
+
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+
+          <div className="flex flex-1 items-center rounded-lg border border-gray-200 bg-white px-4 py-2.5">
+
+            <span className="mr-2 text-gray-400">
+              🔍
+            </span>
+
             <input
               type="text"
-              placeholder="Search by customer name, mobile or prescription ID"
-              className="w-full outline-none text-sm"
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Search by customer name, phone or prescription ID"
+              className="w-full text-sm outline-none"
             />
+
           </div>
-          <button className="bg-indigo-600 text-white px-4 py-2.5 rounded-lg font-medium">
+
+          <button
+            type="button"
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+          >
             + New Prescription
           </button>
+
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-3 gap-4 mb-5 shrink-0">
-          <div className="bg-white p-4 rounded-xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">📄</div>
+        {/* ===================================================
+            CUSTOMER FILTER
+        ==================================================== */}
+
+        {selectedCustomerId && (
+
+          <div className="mb-5 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+
             <div>
-              <p className="text-xs text-gray-500">Total Prescriptions</p>
-              <h3 className="text-xl font-semibold">268</h3>
-              <span className="text-xs text-gray-400">This Month</span>
+
+              <p className="text-xs text-blue-500">
+                Showing prescriptions for selected customer
+              </p>
+
+              <p className="mt-1 text-sm font-medium text-blue-900">
+                Customer Prescription History
+              </p>
+
             </div>
+
+            <button
+              type="button"
+              onClick={clearCustomerFilter}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800"
+            >
+              Show All
+            </button>
+
           </div>
-          <div className="bg-white p-4 rounded-xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">👓</div>
+
+        )}
+
+        {/* ===================================================
+            STAT CARDS
+        ==================================================== */}
+
+        <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+
+          {/* TOTAL */}
+
+          <div className="flex items-center gap-3 rounded-xl bg-white p-4">
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+              📄
+            </div>
+
             <div>
-              <p className="text-xs text-gray-500">Single Vision</p>
-              <h3 className="text-xl font-semibold">112</h3>
-              <span className="text-xs text-green-500">▲ 41.8%</span>
+
+              <p className="text-xs text-gray-500">
+                Total Prescriptions
+              </p>
+
+              <h3 className="text-xl font-semibold text-gray-900">
+                {totalPrescriptions}
+              </h3>
+
+              <span className="text-xs text-gray-400">
+                All Records
+              </span>
+
             </div>
+
           </div>
-          <div className="bg-white p-4 rounded-xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">🕶️</div>
+
+          {/* SINGLE VISION */}
+
+          <div className="flex items-center gap-3 rounded-xl bg-white p-4">
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+              👓
+            </div>
+
             <div>
-              <p className="text-xs text-gray-500">Bifocal</p>
-              <h3 className="text-xl font-semibold">68</h3>
-              <span className="text-xs text-red-500">▼ 25.4%</span>
+
+              <p className="text-xs text-gray-500">
+                Single Vision
+              </p>
+
+              <h3 className="text-xl font-semibold text-gray-900">
+                {singleVisionCount}
+              </h3>
+
+              <span className="text-xs text-gray-400">
+                Records
+              </span>
+
             </div>
+
           </div>
+
+          {/* BIFOCAL */}
+
+          <div className="flex items-center gap-3 rounded-xl bg-white p-4">
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+              🕶️
+            </div>
+
+            <div>
+
+              <p className="text-xs text-gray-500">
+                Bifocal
+              </p>
+
+              <h3 className="text-xl font-semibold text-gray-900">
+                {bifocalCount}
+              </h3>
+
+              <span className="text-xs text-gray-400">
+                Records
+              </span>
+
+            </div>
+
+          </div>
+
         </div>
 
-        {/* Table - only this part scrolls */}
-        <div className="bg-white rounded-xl overflow-y-auto flex-1 min-h-0">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white">
-              <tr>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Prescription ID</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Customer</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Date</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Type</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Right (OD)</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">Left (OS)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prescriptions.map((p, index) => (
-                <tr key={p.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3">{index + 1}</td>
-                  <td className="px-4 py-3 font-medium">{p.rxId}</td>
-                  <td className="px-4 py-3">{p.customer}</td>
-                  <td className="px-4 py-3">{p.date}</td>
-                  <td className="px-4 py-3">{p.type}</td>
-                  <td className="px-4 py-3">{p.right}</td>
-                  <td className="px-4 py-3">{p.left}</td>
+        {/* ===================================================
+            TABLE
+        ==================================================== */}
+
+        <div className="overflow-hidden rounded-xl bg-white">
+
+          <div className="overflow-x-auto">
+
+            <table className="w-full min-w-[1100px] text-sm">
+
+              <thead className="border-b border-gray-100 bg-gray-50">
+
+                <tr>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    #
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Prescription ID
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Customer
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Phone
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Date
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Type
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Right (OD)
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">
+                    Left (OS)
+                  </th>
+
                 </tr>
-              ))}
-            </tbody>
-          </table>
+
+              </thead>
+
+              <tbody>
+
+                {loading ? (
+
+                  <tr>
+
+                    <td
+                      colSpan="8"
+                      className="px-4 py-12 text-center text-xs text-gray-400"
+                    >
+                      Loading prescriptions...
+                    </td>
+
+                  </tr>
+
+                ) : filteredPrescriptions.length >
+                  0 ? (
+
+                  filteredPrescriptions.map(
+                    (p, index) => (
+
+                      <tr
+                        key={
+                          p._id ||
+                          p.PrescriptionId ||
+                          index
+                        }
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+
+                        {/* NUMBER */}
+
+                        <td className="px-4 py-4 text-xs text-gray-500">
+                          {index + 1}
+                        </td>
+
+                        {/* PRESCRIPTION ID */}
+
+                        <td className="px-4 py-4">
+
+                          <span className="text-xs font-semibold text-indigo-600">
+                            {p.PrescriptionId ||
+                              "-"}
+                          </span>
+
+                        </td>
+
+                        {/* CUSTOMER NAME */}
+
+                        <td className="px-4 py-4">
+
+                          <div className="text-xs font-semibold text-gray-800">
+                            {p.CustomerName ||
+                              "-"}
+                          </div>
+
+                        </td>
+
+                        {/* PHONE */}
+
+                        <td className="px-4 py-4">
+
+                          <span className="text-xs text-gray-600">
+                            {p.CustomerPhone ||
+                              "-"}
+                          </span>
+
+                        </td>
+
+                        {/* DATE */}
+
+                        <td className="px-4 py-4">
+
+                          <span className="text-xs text-gray-600">
+                            {formatDate(p.Date)}
+                          </span>
+
+                        </td>
+
+                        {/* TYPE */}
+
+                        <td className="px-4 py-4">
+
+                          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-medium text-indigo-600">
+                            {p.Type || "-"}
+                          </span>
+
+                        </td>
+
+                        {/* RIGHT */}
+
+                        <td className="px-4 py-4">
+
+                          <span className="text-xs text-gray-600">
+                            {formatEye(p.Right)}
+                          </span>
+
+                        </td>
+
+                        {/* LEFT */}
+
+                        <td className="px-4 py-4">
+
+                          <span className="text-xs text-gray-600">
+                            {formatEye(p.Left)}
+                          </span>
+
+                        </td>
+
+                      </tr>
+
+                    )
+                  )
+
+                ) : (
+
+                  <tr>
+
+                    <td
+                      colSpan="8"
+                      className="px-4 py-12 text-center"
+                    >
+
+                      <div className="flex flex-col items-center">
+
+                        <div className="mb-3 text-3xl">
+                          📄
+                        </div>
+
+                        <p className="text-sm font-medium text-gray-600">
+                          {search
+                            ? "No prescriptions found"
+                            : "No prescriptions available"}
+                        </p>
+
+                        <p className="mt-1 text-xs text-gray-400">
+                          {search
+                            ? "Try a different customer name, phone number or prescription ID."
+                            : "Prescriptions added to customers will appear here."}
+                        </p>
+
+                      </div>
+
+                    </td>
+
+                  </tr>
+
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
         </div>
 
       </div>
+
     </div>
-  )
+  );
 }
 
-export default Prescriptions
+export default Prescriptions;
