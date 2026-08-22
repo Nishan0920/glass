@@ -6,7 +6,10 @@ const emptyInventory = {
   category: "",
   brand: "",
   stock: "",
+  sellingprice: "",
 };
+
+const IMAGE_BASE_URL = "http://localhost:3000/uploads/";
 
 const Inventory = () => {
   const [showModal, setShowModal] = useState(false);
@@ -15,6 +18,8 @@ const Inventory = () => {
   const [search, setSearch] = useState("");
 
   const [inventory, setInventory] = useState(emptyInventory);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
   // GET ALL INVENTORY
   const getInventory = async () => {
@@ -22,8 +27,6 @@ const Inventory = () => {
       const result = await axios.get(
         "http://localhost:3000/api/inventoryalldata",
       );
-
-      console.log("GET INVENTORY:", result.data);
 
       if (result.data.success) {
         const inventoryData =
@@ -52,7 +55,7 @@ const Inventory = () => {
       }
     }
   };
-  //for deleting the item from the inventory
+
   const handleDelete = async (inventoryID) => {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this item from inventory?",
@@ -66,20 +69,19 @@ const Inventory = () => {
       );
       if (result.data.success) {
         alert("Item deleted successfully from inventory");
-
         getInventory();
       } else {
-        alert(result.data.message || "Failed to delete customer");
-        if (error.response) {
-          alert(
-            error.response.data.message ||
-              "Server error while deleting customer",
-          );
-        } else {
-          alert("Something went wrong.");
-        }
+        alert(result.data.message || "Failed to delete item");
       }
-    } catch (error) {}
+    } catch (error) {
+      if (error.response) {
+        alert(
+          error.response.data.message || "Server error while deleting item",
+        );
+      } else {
+        alert("Something went wrong.");
+      }
+    }
   };
 
   useEffect(() => {
@@ -95,9 +97,34 @@ const Inventory = () => {
     }));
   };
 
+  // handle image file selection + validation + preview
+  const allowedTypes = ["image/jpeg", "image/png", "image/jfif"];
+  const allowedExtensions = [".jpg", ".jpeg", ".png", ".jfif"];
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+
+    const typeOk = allowedTypes.includes(file.type);
+    const extOk = allowedExtensions.includes(ext);
+
+    if (!typeOk && !extOk) {
+      alert("Only JPG, JPEG, PNG and JFIF images are allowed");
+      e.target.value = "";
+      return;
+    }
+
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const handleAddInventory = () => {
     setEditingInventory(null);
     setInventory(emptyInventory);
+    setImageFile(null);
+    setImagePreview(null);
     setShowModal(true);
   };
 
@@ -109,7 +136,11 @@ const Inventory = () => {
       category: product.Category || "",
       brand: product.Brand || "",
       stock: product.Stock ?? "",
+      sellingprice: product.SellingPrice ?? "",
     });
+
+    setImageFile(null);
+    setImagePreview(product.Image ? `${IMAGE_BASE_URL}${product.Image}` : null);
 
     setShowModal(true);
   };
@@ -118,28 +149,43 @@ const Inventory = () => {
     setShowModal(false);
     setEditingInventory(null);
     setInventory(emptyInventory);
+    setImageFile(null);
+    setImagePreview(null);
   };
-  // for adding and updathing the items in inventory
+
+  // for adding and updating the items in inventory
   const handleOnSubmit = async (e) => {
     e.preventDefault();
 
     try {
       let result;
 
-      const data = {
-        ProductName: inventory.productname,
-        Category: inventory.category,
-        Brand: inventory.brand,
-        Stock: inventory.stock,
+      const formData = new FormData();
+      formData.append("ProductName", inventory.productname);
+      formData.append("Category", inventory.category);
+      formData.append("Brand", inventory.brand);
+      formData.append("Stock", inventory.stock);
+      formData.append("SellingPrice", inventory.sellingprice);
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
+      const config = {
+        headers: { "Content-Type": "multipart/form-data" },
       };
 
       if (editingInventory) {
         result = await axios.put(
           `http://localhost:3000/api/inventory/${editingInventory._id}`,
-          data,
+          formData,
+          config,
         );
       } else {
-        result = await axios.post("http://localhost:3000/api/inventory", data);
+        result = await axios.post(
+          "http://localhost:3000/api/inventory",
+          formData,
+          config,
+        );
       }
 
       if (result.data.success) {
@@ -149,10 +195,7 @@ const Inventory = () => {
             : "Item added successfully",
         );
 
-        setShowModal(false);
-        setEditingInventory(null);
-        setInventory(emptyInventory);
-
+        handleCloseModal();
         await getInventory();
       } else {
         alert(result.data.message || "Operation failed");
@@ -193,7 +236,6 @@ const Inventory = () => {
       <div className="mx-auto flex w-full max-w-[1400px] flex-col">
         <div className="mb-5 rounded-2xl bg-[#14213d] px-8 py-6 text-white">
           <h2 className="text-2xl font-bold">Inventory</h2>
-
           <p className="text-sm text-gray-300">
             Manage your stock and products
           </p>
@@ -224,6 +266,20 @@ const Inventory = () => {
                 key={product._id}
                 className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
               >
+                <div className="h-36 w-full bg-gray-50">
+                  {product.Image ? (
+                    <img
+                      src={`${IMAGE_BASE_URL}${product.Image}`}
+                      alt={product.ProductName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                      No Image
+                    </div>
+                  )}
+                </div>
+
                 <div className="p-4">
                   <h2 className="truncate text-base font-semibold text-gray-900">
                     {product.ProductName || "Unnamed Product"}
@@ -233,7 +289,6 @@ const Inventory = () => {
                     <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-medium text-blue-600">
                       {product.Category || "No Category"}
                     </span>
-
                     <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-600">
                       {product.Brand || "No Brand"}
                     </span>
@@ -242,9 +297,15 @@ const Inventory = () => {
                   <div className="mt-4 space-y-2 border-t border-gray-100 pt-3">
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Stock</span>
-
                       <span className="font-medium text-gray-800">
                         {product.Stock ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Selling Price</span>
+                      <span className="font-medium text-gray-800">
+                        ₹{product.SellingPrice ?? 0}
                       </span>
                     </div>
                   </div>
@@ -261,7 +322,7 @@ const Inventory = () => {
 
                   <button
                     type="button"
-                    onClick={()=> handleDelete(product._id)}
+                    onClick={() => handleDelete(product._id)}
                     className="cursor-pointer text-red-600 hover:text-red-800"
                   >
                     <i className="fa-solid fa-trash-can"></i>
@@ -299,9 +360,29 @@ const Inventory = () => {
                 <div className="space-y-4 p-5">
                   <div>
                     <label className="mb-1 block text-xs font-medium">
-                      Product Name
+                      Product Image
                     </label>
 
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,.jfif"
+                      onChange={handleImageChange}
+                      className="w-full text-xs"
+                    />
+
+                    {imagePreview && (
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="mt-3 h-28 w-28 rounded-md border object-cover"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium">
+                      Product Name
+                    </label>
                     <input
                       type="text"
                       name="productname"
@@ -316,7 +397,6 @@ const Inventory = () => {
                     <label className="mb-1 block text-xs font-medium">
                       Category
                     </label>
-
                     <input
                       type="text"
                       name="category"
@@ -331,7 +411,6 @@ const Inventory = () => {
                     <label className="mb-1 block text-xs font-medium">
                       Brand
                     </label>
-
                     <input
                       type="text"
                       name="brand"
@@ -342,20 +421,37 @@ const Inventory = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-xs font-medium">
-                      Stock
-                    </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium">
+                        Stock
+                      </label>
+                      <input
+                        type="number"
+                        name="stock"
+                        value={inventory.stock}
+                        onChange={handleOnChange}
+                        className="h-10 w-full rounded-md border px-3 text-xs outline-none focus:border-blue-500"
+                        required
+                        min="0"
+                      />
+                    </div>
 
-                    <input
-                      type="number"
-                      name="stock"
-                      value={inventory.stock}
-                      onChange={handleOnChange}
-                      className="h-10 w-full rounded-md border px-3 text-xs outline-none focus:border-blue-500"
-                      required
-                      min="0"
-                    />
+                    <div>
+                      <label className="mb-1 block text-xs font-medium">
+                        Selling Price
+                      </label>
+                      <input
+                        type="number"
+                        name="sellingprice"
+                        value={inventory.sellingprice}
+                        onChange={handleOnChange}
+                        className="h-10 w-full rounded-md border px-3 text-xs outline-none focus:border-blue-500"
+                        required
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
                   </div>
                 </div>
 
